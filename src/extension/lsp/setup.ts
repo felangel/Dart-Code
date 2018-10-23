@@ -1,7 +1,7 @@
-import { ChildProcess } from "child_process";
 import * as path from "path";
+import { Writable } from "stream";
 import * as vs from "vscode";
-import { LanguageClient, LanguageClientOptions } from "vscode-languageclient";
+import { LanguageClient, LanguageClientOptions, StreamInfo } from "vscode-languageclient";
 import * as WebSocket from "ws";
 import { dartVMPath } from "../../shared/constants";
 import { Sdks } from "../../shared/interfaces";
@@ -79,11 +79,28 @@ function createLSPInspectorSocket() {
 	return websocketOutputChannel;
 }
 
-function spawn(sdks: Sdks): Thenable<ChildProcess> {
+function spawn(sdks: Sdks): Thenable<StreamInfo> {
 	// TODO: Replace with constructing an Analyzer that passes LSP flag (but still reads config
 	// from paths etc) and provide it's process.
 	const vmPath = path.join(sdks.dart, dartVMPath);
 	const args = config.previewLspArgs;
 
-	return Promise.resolve(safeSpawn(undefined, vmPath, args));
+	const process = safeSpawn(undefined, vmPath, args);
+
+	console.log(vmPath);
+	console.log(args);
+	process.stdout.on("data", (d) => console.log("<== " + (d && d.toString())));
+	process.stderr.on("data", (d) => console.log("<== STDERR " + (d && d.toString())));
+
+	const writeLogger = new Writable({
+		write(chunk, encoding, callback) {
+			console.log("==> " + chunk.toString());
+			process.stdin.write(chunk, encoding, callback);
+		},
+	});
+
+	return Promise.resolve({
+		reader: process.stdout,
+		writer: writeLogger,
+	});
 }
