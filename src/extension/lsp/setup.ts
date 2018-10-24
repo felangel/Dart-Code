@@ -28,7 +28,7 @@ async function startLsp(context: vs.ExtensionContext, sdks: Sdks): Promise<vs.Di
 	}
 
 	// Create a web socket to the inspector to pipe the logs over.
-	const websocketOutputChannel = lspInspector && createLSPInspectorSocket();
+	const websocketOutputChannel = lspInspector && await openLSPInspectorSocket();
 
 	const clientOptions: LanguageClientOptions = {
 		documentSelector: [{ scheme: "file", language: "dart" }],
@@ -50,33 +50,36 @@ async function startLsp(context: vs.ExtensionContext, sdks: Sdks): Promise<vs.Di
 	return lspClient.start();
 }
 
-function createLSPInspectorSocket() {
-	// Read the inspectors config to see which port it's listening on.
-	const socketPort = vs.workspace.getConfiguration("lspInspector").get("port");
-	const socket = new WebSocket(`ws://localhost:${socketPort}`);
+function openLSPInspectorSocket(): Promise<vs.OutputChannel> {
+	return new Promise((resolve, reject) => {
+		// Read the inspectors config to see which port it's listening on.
+		const socketPort = vs.workspace.getConfiguration("lspInspector").get("port");
+		const socket = new WebSocket(`ws://localhost:${socketPort}`);
 
-	let log = "";
-	const websocketOutputChannel: vs.OutputChannel = {
-		name: "websocket",
-		// Only append the logs but send them later
-		append(value: string) {
-			log += value;
-		},
-		appendLine(value: string) {
-			log += value;
-			if (socket && socket.readyState === WebSocket.OPEN) {
-				socket.send(log);
-			}
-			// console.log(log);
-			log = "";
-		},
-		clear() { }, // tslint:disable-line:no-empty
-		show() { }, // tslint:disable-line:no-empty
-		hide() { }, // tslint:disable-line:no-empty
-		dispose() { }, // tslint:disable-line:no-empty
-	};
+		let log = "";
+		const websocketOutputChannel: vs.OutputChannel = {
+			name: "websocket",
+			// Only append the logs but send them later
+			append(value: string) {
+				log += value;
+			},
+			appendLine(value: string) {
+				log += value;
+				if (socket && socket.readyState === WebSocket.OPEN) {
+					socket.send(log);
+				}
+				// console.log(log);
+				log = "";
+			},
+			clear() { }, // tslint:disable-line:no-empty
+			show() { }, // tslint:disable-line:no-empty
+			hide() { }, // tslint:disable-line:no-empty
+			dispose() { }, // tslint:disable-line:no-empty
+		};
 
-	return websocketOutputChannel;
+		socket.on("open", () => resolve(websocketOutputChannel));
+		socket.on("error", (err: Error) => reject(err));
+	});
 }
 
 function spawn(sdks: Sdks): Thenable<StreamInfo> {
