@@ -1,5 +1,5 @@
 import * as path from "path";
-import { Transform, Writable } from "stream";
+import * as stream from "stream";
 import * as vs from "vscode";
 import { LanguageClient, LanguageClientOptions, StreamInfo } from "vscode-languageclient";
 import * as WebSocket from "ws";
@@ -93,18 +93,20 @@ function spawn(sdks: Sdks): Thenable<StreamInfo> {
 	console.log(vmPath);
 	console.log(args);
 
-	return Promise.resolve({
-		reader: process.stdout.pipe(new Transform({
-			transform: (chunk: string | Buffer, encoding: string, callback: Function) => { // tslint:disable-line:ban-types
-				console.log("<== " + (chunk && chunk.toString().trim()));
-				callback();
-			},
-		})),
-		writer: new Writable({
-			write(chunk, encoding, callback) {
-				console.log("==> " + (chunk && chunk.toString().trim()));
-				process.stdin.write(chunk, encoding, callback);
-			},
-		}),
-	});
+	const reader = process.stdout.pipe(new LoggingTransform("<=="));
+	const writer = new LoggingTransform("==>");
+	writer.pipe(process.stdin);
+
+	return Promise.resolve({ reader, writer });
+}
+
+class LoggingTransform extends stream.Transform {
+	constructor(private prefix: string, opts?: stream.TransformOptions) {
+		super(opts);
+	}
+	public _transform(chunk: any, encoding: string, callback: () => void): void {
+		console.log(`${this.prefix} ${chunk}`);
+		this.push(chunk, encoding);
+		callback();
+	}
 }
