@@ -1,5 +1,5 @@
 import * as path from "path";
-import { Writable } from "stream";
+import { Transform, Writable } from "stream";
 import * as vs from "vscode";
 import { LanguageClient, LanguageClientOptions, StreamInfo } from "vscode-languageclient";
 import * as WebSocket from "ws";
@@ -92,18 +92,19 @@ function spawn(sdks: Sdks): Thenable<StreamInfo> {
 
 	console.log(vmPath);
 	console.log(args);
-	process.stdout.on("data", (d) => console.log("<== " + (d && d.toString())));
-	process.stderr.on("data", (d) => console.log("<== STDERR " + (d && d.toString())));
-
-	const writeLogger = new Writable({
-		write(chunk, encoding, callback) {
-			console.log("==> " + chunk.toString());
-			process.stdin.write(chunk, encoding, callback);
-		},
-	});
 
 	return Promise.resolve({
-		reader: process.stdout,
-		writer: writeLogger,
+		reader: process.stdout.pipe(new Transform({
+			transform: (chunk: string | Buffer, encoding: string, callback: Function) => { // tslint:disable-line:ban-types
+				console.log("<== " + (chunk && chunk.toString().trim()));
+				callback();
+			},
+		})),
+		writer: new Writable({
+			write(chunk, encoding, callback) {
+				console.log("==> " + (chunk && chunk.toString().trim()));
+				process.stdin.write(chunk, encoding, callback);
+			},
+		}),
 	});
 }
