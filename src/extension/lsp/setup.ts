@@ -34,9 +34,14 @@ async function startLsp(context: vs.ExtensionContext, sdks: Sdks): Promise<vs.Di
 		documentSelector: [{ scheme: "file", language: "dart" }],
 		outputChannel: websocketOutputChannel,
 		synchronize: {
-			// TODO: What are .clientrc? Should we replace this?
-			// Notify the server about file changes to '.clientrc files contained in the workspace
-			fileEvents: vs.workspace.createFileSystemWatcher("**/.clientrc"),
+			// Keep this in sync with the isAnalyzable function.
+			fileEvents: [
+				vs.workspace.createFileSystemWatcher("**/*.dart"),
+				vs.workspace.createFileSystemWatcher("**/*.html"),
+				vs.workspace.createFileSystemWatcher("**/pubspec.yaml"),
+				vs.workspace.createFileSystemWatcher("**/analysis_options.yaml"),
+				vs.workspace.createFileSystemWatcher("**/.analysis_options"),
+			],
 		},
 	};
 
