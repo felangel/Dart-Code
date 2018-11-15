@@ -218,7 +218,7 @@ export function activate(context: vs.ExtensionContext, isRestart: boolean = fals
 	const hoverProvider = isUsingLsp ? undefined : new DartHoverProvider(logger, analyzer);
 	const formattingEditProvider = isUsingLsp ? undefined : new DartFormattingEditProvider(logger, analyzer, extContext);
 	context.subscriptions.push(formattingEditProvider);
-	const completionItemProvider = new DartCompletionItemProvider(logger, analyzer);
+	const completionItemProvider = isUsingLsp ? undefined : new DartCompletionItemProvider(logger, analyzer);
 	const referenceProvider = new DartReferenceProvider(analyzer);
 	const documentHighlightProvider = new DartDocumentHighlightProvider(analyzer);
 	const sourceCodeActionProvider = new SourceCodeActionProvider();
@@ -241,7 +241,8 @@ export function activate(context: vs.ExtensionContext, isRestart: boolean = fals
 		context.subscriptions.push(vs.languages.registerHoverProvider(activeFileFilters, hoverProvider));
 	if (formattingEditProvider)
 		formattingEditProvider.registerDocumentFormatter(activeFileFilters);
-	context.subscriptions.push(vs.languages.registerCompletionItemProvider(activeFileFilters, completionItemProvider, ...triggerCharacters));
+	if (completionItemProvider)
+		context.subscriptions.push(vs.languages.registerCompletionItemProvider(activeFileFilters, completionItemProvider, ...triggerCharacters));
 	context.subscriptions.push(vs.languages.registerDefinitionProvider(activeFileFilters, referenceProvider));
 	context.subscriptions.push(vs.languages.registerReferenceProvider(activeFileFilters, referenceProvider));
 	context.subscriptions.push(vs.languages.registerDocumentHighlightProvider(activeFileFilters, documentHighlightProvider));
