@@ -219,7 +219,7 @@ export function activate(context: vs.ExtensionContext, isRestart: boolean = fals
 	const formattingEditProvider = isUsingLsp ? undefined : new DartFormattingEditProvider(logger, analyzer, extContext);
 	context.subscriptions.push(formattingEditProvider);
 	const completionItemProvider = isUsingLsp ? undefined : new DartCompletionItemProvider(logger, analyzer);
-	const referenceProvider = new DartReferenceProvider(analyzer);
+	const referenceProvider = isUsingLsp ? undefined : new DartReferenceProvider(analyzer);
 	const documentHighlightProvider = new DartDocumentHighlightProvider(analyzer);
 	const sourceCodeActionProvider = new SourceCodeActionProvider();
 
@@ -243,8 +243,10 @@ export function activate(context: vs.ExtensionContext, isRestart: boolean = fals
 		formattingEditProvider.registerDocumentFormatter(activeFileFilters);
 	if (completionItemProvider)
 		context.subscriptions.push(vs.languages.registerCompletionItemProvider(activeFileFilters, completionItemProvider, ...triggerCharacters));
-	context.subscriptions.push(vs.languages.registerDefinitionProvider(activeFileFilters, referenceProvider));
-	context.subscriptions.push(vs.languages.registerReferenceProvider(activeFileFilters, referenceProvider));
+	if (referenceProvider) {
+		context.subscriptions.push(vs.languages.registerDefinitionProvider(activeFileFilters, referenceProvider));
+		context.subscriptions.push(vs.languages.registerReferenceProvider(activeFileFilters, referenceProvider));
+	}
 	context.subscriptions.push(vs.languages.registerDocumentHighlightProvider(activeFileFilters, documentHighlightProvider));
 	rankingCodeActionProvider.registerProvider(new AssistCodeActionProvider(logger, activeFileFilters, analyzer));
 	rankingCodeActionProvider.registerProvider(new FixCodeActionProvider(logger, activeFileFilters, analyzer));
