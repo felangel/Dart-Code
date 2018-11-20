@@ -33,16 +33,6 @@ async function startLsp(context: vs.ExtensionContext, sdks: Sdks): Promise<vs.Di
 	const clientOptions: LanguageClientOptions = {
 		documentSelector: [{ scheme: "file", language: "dart" }],
 		outputChannel: websocketOutputChannel,
-		synchronize: {
-			// Keep this in sync with the isAnalyzable function.
-			fileEvents: [
-				vs.workspace.createFileSystemWatcher("**/*.dart"),
-				vs.workspace.createFileSystemWatcher("**/*.html"),
-				vs.workspace.createFileSystemWatcher("**/pubspec.yaml"),
-				vs.workspace.createFileSystemWatcher("**/analysis_options.yaml"),
-				vs.workspace.createFileSystemWatcher("**/.analysis_options"),
-			],
-		},
 	};
 
 	lspClient = new LanguageClient(
