@@ -31,7 +31,13 @@ async function startLsp(context: vs.ExtensionContext, sdks: Sdks): Promise<vs.Di
 	const websocketOutputChannel = lspInspector && await openLSPInspectorSocket();
 
 	const clientOptions: LanguageClientOptions = {
-		documentSelector: [{ scheme: "file", language: "dart" }],
+		// Keep in sync with isAnalyzable().
+		documentSelector: [
+			{ scheme: "file", language: "dart" },
+			{ scheme: "file", language: "html" },
+			{ scheme: "file", language: "yaml", pattern: "**/pubspec.yaml" },
+			{ scheme: "file", language: "yaml", pattern: "**/analysis_options.yaml" },
+		],
 		outputChannel: websocketOutputChannel,
 	};
 
