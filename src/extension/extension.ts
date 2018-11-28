@@ -341,10 +341,12 @@ export function activate(context: vs.ExtensionContext, isRestart: boolean = fals
 				...(config.triggerSignatureHelpAutomatically ? ["(", ","] : []),
 			));
 
-		const documentSymbolProvider = new DartDocumentSymbolProvider(logger, analyzer);
-		activeFileFilters.forEach((filter) => {
-			context.subscriptions.push(vs.languages.registerDocumentSymbolProvider(filter, documentSymbolProvider));
-		});
+		const documentSymbolProvider = isUsingLsp ? undefined : new DartDocumentSymbolProvider(logger, analyzer);
+		if (documentSymbolProvider) {
+			activeFileFilters.forEach((filter) => {
+				context.subscriptions.push(vs.languages.registerDocumentSymbolProvider(filter, documentSymbolProvider));
+			});
+		}
 
 		context.subscriptions.push(openFileTracker.create(logger, analyzer, workspaceContext));
 
