@@ -245,14 +245,17 @@ export function activate(context: vs.ExtensionContext, isRestart: boolean = fals
 		context.subscriptions.push(vs.languages.registerReferenceProvider(activeFileFilters, referenceProvider));
 	}
 	context.subscriptions.push(vs.languages.registerDocumentHighlightProvider(activeFileFilters, documentHighlightProvider));
-	rankingCodeActionProvider.registerProvider(new AssistCodeActionProvider(logger, activeFileFilters, analyzer));
-	rankingCodeActionProvider.registerProvider(new FixCodeActionProvider(logger, activeFileFilters, analyzer));
-	rankingCodeActionProvider.registerProvider(new RefactorCodeActionProvider(activeFileFilters, analyzer));
+	if (!isUsingLsp) {
+		rankingCodeActionProvider.registerProvider(new AssistCodeActionProvider(logger, activeFileFilters, analyzer));
+		rankingCodeActionProvider.registerProvider(new FixCodeActionProvider(logger, activeFileFilters, analyzer));
+		rankingCodeActionProvider.registerProvider(new RefactorCodeActionProvider(activeFileFilters, analyzer));
+	}
 	context.subscriptions.push(vs.languages.registerRenameProvider(activeFileFilters, renameProvider));
 
 	// Some actions only apply to Dart.
 	formattingEditProvider.registerTypingFormatter(DART_MODE, "}", ";");
-	context.subscriptions.push(vs.languages.registerCodeActionsProvider(DART_MODE, sourceCodeActionProvider, sourceCodeActionProvider.metadata));
+	if (!isUsingLsp)
+		context.subscriptions.push(vs.languages.registerCodeActionsProvider(DART_MODE, sourceCodeActionProvider, sourceCodeActionProvider.metadata));
 
 	rankingCodeActionProvider.registerProvider(new IgnoreLintCodeActionProvider(activeFileFilters));
 	context.subscriptions.push(vs.languages.registerImplementationProvider(DART_MODE, implementationProvider));
