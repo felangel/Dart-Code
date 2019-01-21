@@ -48,6 +48,11 @@ async function startLsp(context: vs.ExtensionContext, sdks: Sdks): Promise<vs.Di
 		clientOptions,
 	);
 
+	lspClient.onReady().then(async () => {
+		const diagServer = await lspClient.sendRequest<{ port: number }>("dart/diagnosticServer");
+		util.openInBrowser(`http://localhost:${diagServer.port}`);
+	});
+
 	return lspClient.start();
 }
 
