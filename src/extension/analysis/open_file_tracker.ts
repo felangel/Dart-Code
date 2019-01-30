@@ -1,8 +1,9 @@
 import { Disposable, TextDocument, Uri, window, workspace } from "vscode";
 import { FlutterOutline, FoldingRegion, Occurrences, Outline } from "../../shared/analysis_server_types";
-import { IAmDisposable, Logger } from "../../shared/interfaces";
+import { Logger, IAmDisposable } from "../../shared/interfaces";
 import { fsPath } from "../../shared/vscode/utils";
 import { WorkspaceContext } from "../../shared/workspace";
+import { isUsingLsp } from "../extension";
 import { locateBestProjectRoot } from "../project";
 import * as util from "../utils";
 import { Analyzer } from "./analyzer";
@@ -77,8 +78,8 @@ class OpenFileTracker implements IAmDisposable {
 			await this.analyzer.analysisSetSubscriptions({
 				subscriptions: {
 					CLOSING_LABELS: this.analyzer.capabilities.supportsClosingLabels ? openFiles : undefined,
-					FOLDING: openFiles,
-					OCCURRENCES: openFiles,
+					FOLDING: isUsingLsp ? undefined : openFiles,
+					OCCURRENCES: isUsingLsp ? undefined : openFiles,
 					OUTLINE: openFiles,
 				},
 			});

@@ -101,7 +101,7 @@ let analytics: Analytics;
 let showTodos: boolean | undefined;
 let previousSettings: string;
 let extensionLogger: { dispose: () => Promise<void> | void };
-let isUsingLsp = false;
+export let isUsingLsp = false;
 
 // TODO: If dev mode, subscribe to logs for errors/warnings and surface to UI
 // (with dispose calls)
