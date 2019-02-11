@@ -329,10 +329,12 @@ export function activate(context: vs.ExtensionContext, isRestart: boolean = fals
 			context.subscriptions.push(new ClosingLabelsDecorations(analyzer));
 		}
 
-		if (analyzer.capabilities.supportsGetDeclerations) {
-			context.subscriptions.push(vs.languages.registerWorkspaceSymbolProvider(new DartWorkspaceSymbolProvider(logger, analyzer)));
-		} else {
-			context.subscriptions.push(vs.languages.registerWorkspaceSymbolProvider(new LegacyDartWorkspaceSymbolProvider(logger, analyzer)));
+		if (!isUsingLsp) {
+			if (analyzer.capabilities.supportsGetDeclerations) {
+				context.subscriptions.push(vs.languages.registerWorkspaceSymbolProvider(new DartWorkspaceSymbolProvider(logger, analyzer)));
+			} else {
+				context.subscriptions.push(vs.languages.registerWorkspaceSymbolProvider(new LegacyDartWorkspaceSymbolProvider(logger, analyzer)));
+			}
 		}
 
 		if (analyzer.capabilities.supportsCustomFolding && config.analysisServerFolding)
