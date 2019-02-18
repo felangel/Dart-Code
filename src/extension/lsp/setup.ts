@@ -38,6 +38,9 @@ async function startLsp(context: vs.ExtensionContext, sdks: Sdks): Promise<vs.Di
 			{ scheme: "file", language: "yaml", pattern: "**/pubspec.yaml" },
 			{ scheme: "file", language: "yaml", pattern: "**/analysis_options.yaml" },
 		],
+		// initializationOptions: {
+		// 	onlyAnalyzeProjectsWithOpenFiles: true,
+		// },
 		outputChannel: websocketOutputChannel,
 	};
 
