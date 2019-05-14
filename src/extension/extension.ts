@@ -219,7 +219,6 @@ export function activate(context: vs.ExtensionContext, isRestart: boolean = fals
 	const completionItemProvider = isUsingLsp ? undefined : new DartCompletionItemProvider(logger, analyzer);
 	const referenceProvider = isUsingLsp ? undefined : new DartReferenceProvider(analyzer);
 	const renameProvider = new DartRenameProvider(analyzer);
-	const implementationProvider = new DartImplementationProvider(analyzer);
 
 	const activeFileFilters = [DART_MODE];
 	if (config.analyzeAngularTemplates && analyzer.capabilities.supportsAnalyzingHtmlFiles) {
@@ -255,10 +254,10 @@ export function activate(context: vs.ExtensionContext, isRestart: boolean = fals
 
 		// Dart only.
 		context.subscriptions.push(vs.languages.registerCodeActionsProvider(DART_MODE, new SourceCodeActionProvider(), SourceCodeActionProvider.metadata));
+		context.subscriptions.push(vs.languages.registerImplementationProvider(DART_MODE, new DartImplementationProvider(analyzer)));
 	}
 
 	rankingCodeActionProvider.registerProvider(new IgnoreLintCodeActionProvider(activeFileFilters));
-	context.subscriptions.push(vs.languages.registerImplementationProvider(DART_MODE, implementationProvider));
 	if (config.showTestCodeLens) {
 		const codeLensProvider = new TestCodeLensProvider(logger, analyzer);
 		context.subscriptions.push(codeLensProvider);
