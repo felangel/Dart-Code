@@ -7,6 +7,7 @@ import { dartVMPath } from "../../shared/constants";
 import { Sdks } from "../../shared/interfaces";
 import { openInBrowser } from "../../shared/vscode/utils";
 import { config } from "../config";
+import { openInBrowser } from "../utils";
 import { safeSpawn } from "../utils/processes";
 
 let lspClient: LanguageClient;
