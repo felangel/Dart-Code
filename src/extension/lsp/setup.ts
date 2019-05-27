@@ -21,12 +21,12 @@ export function initLSP(context: vs.ExtensionContext, sdks: Sdks) {
 async function startLsp(context: vs.ExtensionContext, sdks: Sdks): Promise<vs.Disposable> {
 	const clientOptions: LanguageClientOptions = {
 		// Keep in sync with isAnalyzable().
-		documentSelector: [
-			{ scheme: "file", language: "dart" },
-			{ scheme: "file", language: "html" },
-			{ scheme: "file", language: "yaml", pattern: "**/pubspec.yaml" },
-			{ scheme: "file", language: "yaml", pattern: "**/analysis_options.yaml" },
-		],
+		// documentSelector: [
+		// 	{ scheme: "file", language: "dart" },
+		// 	{ scheme: "file", language: "html" },
+		// 	{ scheme: "file", language: "yaml", pattern: "**/pubspec.yaml" },
+		// 	{ scheme: "file", language: "yaml", pattern: "**/analysis_options.yaml" },
+		// ],
 		// initializationOptions: {
 		// 	onlyAnalyzeProjectsWithOpenFiles: true,
 		// },
