@@ -2,6 +2,7 @@ import * as vs from "vscode";
 import { LanguageClient } from "vscode-languageclient";
 import { fsPath } from "../../shared/vscode/utils";
 import { ClosingLabelsParams, PublishClosingLabelsNotification } from "./custom_protocol";
+import { lspClient } from "./setup";
 
 export class LspClosingLabelsDecorations implements vs.Disposable {
 	private subscriptions: vs.Disposable[] = [];
@@ -53,19 +54,19 @@ export class LspClosingLabelsDecorations implements vs.Disposable {
 
 		const decorations: { [key: number]: vs.DecorationOptions } = [];
 		for (const r of this.closingLabels[filePath].labels) {
-			const finalCharacterPosition = r.range.end;
+			const range = lspClient.protocol2CodeConverter.asRange(r.range);
 			const finalCharacterRange =
-				finalCharacterPosition.character > 0
+				range.end.character > 0
 					? new vs.Range(
-						new vs.Position(finalCharacterPosition.line, finalCharacterPosition.character - 1),
-						new vs.Position(finalCharacterPosition.line, finalCharacterPosition.character),
+						range.end.translate({ characterDelta: -1 }),
+						range.end,
 					)
 					: new vs.Range(
-						new vs.Position(finalCharacterPosition.line, finalCharacterPosition.character),
-						new vs.Position(finalCharacterPosition.line, finalCharacterPosition.character + 1),
+						range.end,
+						range.end.translate({ characterDelta: 1 }),
 					);
 			const finalCharacterText = editor.document.getText(finalCharacterRange);
-			const endOfLine = editor.document.lineAt(finalCharacterPosition.line).range.end;
+			const endOfLine = editor.document.lineAt(range.end.line).range.end;
 
 			// We won't update if we had any bad notifications as this usually means either bad code resulted
 			// in wonky results or the document was updated before the notification came back.
@@ -77,7 +78,7 @@ export class LspClosingLabelsDecorations implements vs.Disposable {
 				existingDecorationForLine.renderOptions.after.contentText = " // " + r.label + " " + existingDecorationForLine.renderOptions.after.contentText;
 			} else {
 				const dec = {
-					range: new vs.Range(new vs.Position(r.range.start.line, r.range.start.character), endOfLine),
+					range: new vs.Range(range.start, endOfLine),
 					renderOptions: { after: { contentText: " // " + r.label } },
 				};
 				decorations[endOfLine.line] = dec;
