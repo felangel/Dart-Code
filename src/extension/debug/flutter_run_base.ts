@@ -5,12 +5,12 @@ import { StdIOService, UnknownNotification, UnknownResponse } from "../services/
 export abstract class FlutterRunBase extends StdIOService<UnknownNotification> {
 	constructor(
 		public readonly mode: RunMode,
-		getLogFile: () => string,
+		logFile: string | undefined,
 		logger: Logger,
 		maxLogLineLength: number,
 		messagesWrappedInBrackets: boolean = false,
 		treatHandlingErrorsAsUnhandledMessages: boolean = false) {
-		super(getLogFile, logger, maxLogLineLength, messagesWrappedInBrackets, treatHandlingErrorsAsUnhandledMessages);
+		super(logger, maxLogLineLength, messagesWrappedInBrackets, treatHandlingErrorsAsUnhandledMessages, logFile);
 	}
 
 	protected shouldHandleMessage(message: string): boolean {
