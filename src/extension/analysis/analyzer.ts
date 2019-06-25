@@ -1,7 +1,10 @@
+import * as fs from "fs";
+import * as path from "path";
 import * as vs from "vscode";
 import * as as from "../../shared/analysis_server_types";
+import { analyzerSnapshotPath, dartVMPath } from "../../shared/constants";
 import { LogCategory } from "../../shared/enums";
-import { Logger } from "../../shared/interfaces";
+import { Logger, Sdks } from "../../shared/interfaces";
 import { PromiseCompleter, versionIsAtLeast } from "../../shared/utils";
 import { config } from "../config";
 import { escapeShell, extensionVersion, reloadExtension } from "../utils";
@@ -43,34 +46,10 @@ export class Analyzer extends AnalyzerGen {
 	private currentAnalysisCompleter?: PromiseCompleter<void>;
 	public capabilities: AnalyzerCapabilities = AnalyzerCapabilities.empty;
 
-	constructor(logger: Logger, dartVMPath: string, analyzerPath: string) {
+	constructor(logger: Logger, sdks: Sdks) {
 		super(logger, () => config.analyzerLogFile, config.maxLogLineLength);
 
-		let analyzerArgs = [];
-
-		// Optionally start Observatory for the analyzer.
-		if (config.analyzerObservatoryPort)
-			analyzerArgs.push(`--enable-vm-service=${config.analyzerObservatoryPort}`);
-
-		analyzerArgs.push(analyzerPath);
-
-		// Optionally start the analyzer's diagnostic web server on the given port.
-		if (config.analyzerDiagnosticsPort)
-			analyzerArgs.push(`--port=${config.analyzerDiagnosticsPort}`);
-
-		// Add info about the extension that will be collected for crash reports etc.
-		analyzerArgs.push(`--client-id=Dart-Code.dart-code`);
-		analyzerArgs.push(`--client-version=${extensionVersion}`);
-
-		// The analysis server supports a verbose instrumentation log file.
-		if (config.analyzerInstrumentationLogFile)
-			analyzerArgs.push(`--instrumentation-log-file=${config.analyzerInstrumentationLogFile}`);
-
-		// Allow arbitrary args to be passed to the analysis server.
-		if (config.analyzerAdditionalArgs)
-			analyzerArgs = analyzerArgs.concat(config.analyzerAdditionalArgs);
-
-		this.launchArgs = analyzerArgs;
+		this.launchArgs = getAnalyzerArgs(logger, sdks, false);
 
 		// Hook error subscriptions so we can try and get diagnostic info if this happens.
 		this.registerForServerError((e) => this.requestDiagnosticsUpdate());
@@ -79,8 +58,9 @@ export class Analyzer extends AnalyzerGen {
 		// Register for version.
 		this.registerForServerConnected((e) => { this.version = e.version; this.capabilities.version = this.version; });
 
-		let binaryPath = dartVMPath;
-		let processArgs = analyzerArgs.slice();
+		const fullDartVmPath = path.join(sdks.dart, dartVMPath);
+		let binaryPath = fullDartVmPath;
+		let processArgs = this.launchArgs.slice();
 
 		// Since we communicate with the analysis server over STDOUT/STDIN, it is trivial for us
 		// to support launching it on a remote machine over SSH. This can be useful if the codebase
@@ -88,7 +68,7 @@ export class Analyzer extends AnalyzerGen {
 		// result in excessive file reading over SSHFS.
 		if (config.analyzerSshHost) {
 			binaryPath = "ssh";
-			processArgs.unshift(dartVMPath);
+			processArgs.unshift(fullDartVmPath);
 			processArgs = [
 				// SSH quiet mode, which prevents SSH from interfering with the STDOUT/STDIN communication
 				// with the analysis server.
@@ -254,6 +234,52 @@ export class Analyzer extends AnalyzerGen {
 			}, () => reject());
 		});
 	}
+}
+
+export function getAnalyzerArgs(logger: Logger, sdks: Sdks, isLsp: boolean) {
+	const analyzerPath = config.analyzerPath || path.join(sdks.dart, analyzerSnapshotPath);
+
+	// If the ssh host is set, then we are running the analyzer on a remote machine, that same analyzer
+	// might not exist on the local machine.
+	if (!config.analyzerSshHost && !fs.existsSync(analyzerPath)) {
+		const msg = "Could not find a Dart Analysis Server at " + analyzerPath;
+		vs.window.showErrorMessage(msg);
+		logger.error(msg);
+		throw new Error(msg);
+	}
+
+	return buildAnalyzerArgs(analyzerPath, isLsp);
+}
+
+function buildAnalyzerArgs(analyzerPath: string, isLsp: boolean) {
+	let analyzerArgs = [];
+
+	// Optionally start Observatory for the analyzer.
+	if (config.analyzerObservatoryPort)
+		analyzerArgs.push(`--enable-vm-service=${config.analyzerObservatoryPort}`);
+
+	analyzerArgs.push(analyzerPath);
+
+	if (isLsp)
+		analyzerArgs.push("--lsp");
+
+	// Optionally start the analyzer's diagnostic web server on the given port.
+	if (config.analyzerDiagnosticsPort)
+		analyzerArgs.push(`--port=${config.analyzerDiagnosticsPort}`);
+
+	// Add info about the extension that will be collected for crash reports etc.
+	analyzerArgs.push(`--client-id=Dart-Code.dart-code`);
+	analyzerArgs.push(`--client-version=${extensionVersion}`);
+
+	// The analysis server supports a verbose instrumentation log file.
+	if (config.analyzerInstrumentationLogFile)
+		analyzerArgs.push(`--instrumentation-log-file=${config.analyzerInstrumentationLogFile}`);
+
+	// Allow arbitrary args to be passed to the analysis server.
+	if (config.analyzerAdditionalArgs)
+		analyzerArgs = analyzerArgs.concat(config.analyzerAdditionalArgs);
+
+	return analyzerArgs;
 }
 
 export function getSymbolKindForElementKind(logger: Logger, kind: as.ElementKind): vs.SymbolKind {
