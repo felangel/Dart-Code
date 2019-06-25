@@ -8,6 +8,5 @@
 	"dart.analysisExcludedFolders": [
 		"lib/excluded"
 	],
-	"dart.showIgnoreQuickFixes": true,
-	"dart.previewLsp": true
+	"dart.showIgnoreQuickFixes": true
 }
