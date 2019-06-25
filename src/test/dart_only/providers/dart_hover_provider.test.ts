@@ -53,7 +53,7 @@ describe("dart_hover_provider", () => {
 	}
 
 	function getExpectedDoc(packagePath: string, doc: string): string {
-		return (extApi.analyzerCapabilities.hasNewHoverLibraryFormat) && packagePath
+		return (extApi.lspClient || extApi.analyzerCapabilities.hasNewHoverLibraryFormat) && packagePath
 			? `*${packagePath}*\n\n${doc}`
 			: doc;
 	}

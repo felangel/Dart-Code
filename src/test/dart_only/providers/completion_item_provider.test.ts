@@ -18,7 +18,11 @@ describe("completion_item_provider", () => {
 		ensureCompletion(completions, vs.CompletionItemKind.Function, "exit");
 	});
 
-	it("adds parens on functions in code", async () => {
+	it("adds parens on functions in code", async function () {
+		if (extApi.lspClient) {
+			this.skip();
+			return;
+		}
 		const doc = currentDoc();
 		await setTestContent(doc.getText().replace(/\/\/ IMPORTS HERE/mg, "import 'dart:io' show exit;"));
 		await setTestContent(doc.getText().replace(/\/\/ MAIN HERE/mg, "exi //"));

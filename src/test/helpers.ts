@@ -137,6 +137,7 @@ export async function activateWithoutAnalysis(): Promise<void> {
 		}
 	} else
 		console.warn("Extension has no exports, it probably has not activated correctly! Check the extension startup logs.");
+	await extApi.lspClient.onReady();
 }
 
 export async function activate(file?: vs.Uri | null | undefined): Promise<void> {
