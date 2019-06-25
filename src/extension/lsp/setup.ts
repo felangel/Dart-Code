@@ -48,11 +48,16 @@ function spawn(logger: Logger, sdks: Sdks): Thenable<StreamInfo> {
 	console.log(vmPath);
 	console.log(args);
 
-	const reader = process.stdout.pipe(new LoggingTransform("<=="));
-	const writer = new LoggingTransform("==>");
-	writer.pipe(process.stdin);
+	if (true) {
+		return Promise.resolve({ reader: process.stdout, writer: process.stdin });
+	} else {
+		// TODO: Run this through logger once the in-process logging changes
+		const reader = process.stdout.pipe(new LoggingTransform("<=="));
+		const writer = new LoggingTransform("==>");
+		writer.pipe(process.stdin);
 
-	return Promise.resolve({ reader, writer });
+		return Promise.resolve({ reader, writer });
+	}
 }
 
 class LoggingTransform extends stream.Transform {
