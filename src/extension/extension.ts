@@ -1,9 +1,8 @@
-import * as fs from "fs";
 import * as path from "path";
 import { isArray } from "util";
 import * as vs from "vscode";
 import { FlutterCapabilities } from "../shared/capabilities/flutter";
-import { analyzerSnapshotPath, dartPlatformName, dartVMPath, flutterExtensionIdentifier, flutterPath, HAS_LAST_DEBUG_CONFIG, isWin, platformDisplayName } from "../shared/constants";
+import { dartPlatformName, flutterExtensionIdentifier, flutterPath, HAS_LAST_DEBUG_CONFIG, isWin, platformDisplayName } from "../shared/constants";
 import { LogCategory } from "../shared/enums";
 import { Sdks } from "../shared/interfaces";
 import { captureLogs, EmittingLogger } from "../shared/logging";
@@ -161,8 +160,8 @@ export function activate(context: vs.ExtensionContext, isRestart: boolean = fals
 		context.subscriptions.push(new StatusBarVersionTracker(workspaceContext));
 	}
 
-	if (config.previewLsp && config.previewLspArgs && config.previewLspArgs.length) {
-		context.subscriptions.push(initLSP(context, sdks));
+	if (config.previewLsp) {
+		context.subscriptions.push(initLSP(logger, sdks));
 		isUsingLsp = true;
 	}
 
@@ -172,15 +171,7 @@ export function activate(context: vs.ExtensionContext, isRestart: boolean = fals
 
 	// Fire up the analyzer process.
 	const analyzerStartTime = new Date();
-	const analyzerPath = config.analyzerPath || path.join(sdks.dart, analyzerSnapshotPath);
-	// If the ssh host is set, then we are running the analyzer on a remote machine, that same analyzer
-	// might not exist on the local machine.
-	if (!config.analyzerSshHost && !fs.existsSync(analyzerPath)) {
-		vs.window.showErrorMessage("Could not find a Dart Analysis Server at " + analyzerPath);
-		return;
-	}
-
-	analyzer = new Analyzer(logger, path.join(sdks.dart, dartVMPath), analyzerPath);
+	analyzer = new Analyzer(logger, sdks);
 	context.subscriptions.push(analyzer);
 
 	// Log analysis server startup time when we get the welcome message/version.

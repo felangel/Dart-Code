@@ -92,7 +92,6 @@ class Config {
 
 	// Preview features.
 	get previewLsp() { return this.getConfig<boolean>("previewLsp", false); }
-	get previewLspArgs() { return this.getConfig<string[]>("previewLspVmArgs", []); }
 
 	public for(uri?: Uri): ResourceConfig {
 		return new ResourceConfig(uri);

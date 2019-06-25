@@ -3,22 +3,22 @@ import * as stream from "stream";
 import * as vs from "vscode";
 import { LanguageClient, LanguageClientOptions, StreamInfo } from "vscode-languageclient";
 import { dartVMPath } from "../../shared/constants";
-import { Sdks } from "../../shared/interfaces";
-import { openInBrowser } from "../../shared/vscode/utils";
+import { Logger, Sdks } from "../../shared/interfaces";
+import { getAnalyzerArgs } from "../analysis/analyzer";
 import { config } from "../config";
 import { safeSpawn } from "../utils/processes";
 
 export let lspClient: LanguageClient;
 
-export function initLSP(context: vs.ExtensionContext, sdks: Sdks) {
+export function initLSP(logger: Logger, sdks: Sdks) {
 	vs.window.showInformationMessage("LSP preview is enabled!");
-	const client = startLsp(context, sdks);
+	const client = startLsp(logger, sdks);
 	return {
 		dispose: async (): Promise<void> => (await client).dispose(),
 	};
 }
 
-async function startLsp(context: vs.ExtensionContext, sdks: Sdks): Promise<vs.Disposable> {
+async function startLsp(logger: Logger, sdks: Sdks): Promise<vs.Disposable> {
 	const clientOptions: LanguageClientOptions = {
 		initializationOptions: {
 			// 	onlyAnalyzeProjectsWithOpenFiles: true,
@@ -30,18 +30,18 @@ async function startLsp(context: vs.ExtensionContext, sdks: Sdks): Promise<vs.Di
 	lspClient = new LanguageClient(
 		"dartAnalysisLSP",
 		"Dart Analysis Server",
-		() => spawn(sdks),
+		() => spawn(logger, sdks),
 		clientOptions,
 	);
 
 	return lspClient.start();
 }
 
-function spawn(sdks: Sdks): Thenable<StreamInfo> {
+function spawn(logger: Logger, sdks: Sdks): Thenable<StreamInfo> {
 	// TODO: Replace with constructing an Analyzer that passes LSP flag (but still reads config
 	// from paths etc) and provide it's process.
 	const vmPath = path.join(sdks.dart, dartVMPath);
-	const args = config.previewLspArgs;
+	const args = getAnalyzerArgs(logger, sdks, config.previewLsp);
 
 	const process = safeSpawn(undefined, vmPath, args);
 
