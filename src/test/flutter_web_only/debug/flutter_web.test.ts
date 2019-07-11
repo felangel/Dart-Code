@@ -317,12 +317,7 @@ describe("flutter for web debugger", () => {
 				? ""
 				: ` after ${numReloads} reload${numReloads === 1 ? "" : "s"}`;
 
-		it("stops at a breakpoint" + reloadDescription, async function () {
-			if (!extApi.flutterCapabilities.webSupportsDebugging) {
-				this.skip();
-				return;
-			}
-
+		it("stops at a breakpoint" + reloadDescription, async () => {
 			await openFile(flutterWebHelloWorldMainFile);
 			const config = await startDebugger(flutterWebHelloWorldMainFile);
 			const expectedLocation = {
@@ -366,12 +361,7 @@ describe("flutter for web debugger", () => {
 	});
 
 	describe("can evaluate at breakpoint", () => {
-		it("simple expressions", async function () {
-			if (!extApi.flutterCapabilities.webSupportsDebugging) {
-				this.skip();
-				return;
-			}
-
+		it("simple expressions", async () => {
 			await openFile(flutterWebHelloWorldMainFile);
 			const config = await startDebugger(flutterWebHelloWorldMainFile);
 			await Promise.all([
@@ -387,12 +377,7 @@ describe("flutter for web debugger", () => {
 			assert.equal(evaluateResult.variablesReference, 0);
 		});
 
-		it("complex expression expressions", async function () {
-			if (!extApi.flutterCapabilities.webSupportsDebugging) {
-				this.skip();
-				return;
-			}
-
+		it("complex expression expressions", async () => {
 			await openFile(flutterWebHelloWorldMainFile);
 			const config = await startDebugger(flutterWebHelloWorldMainFile);
 			await Promise.all([
@@ -408,12 +393,7 @@ describe("flutter for web debugger", () => {
 			assert.equal(evaluateResult.variablesReference, 0);
 		});
 
-		it("an expression that returns a variable", async function () {
-			if (!extApi.flutterCapabilities.webSupportsDebugging) {
-				this.skip();
-				return;
-			}
-
+		it("an expression that returns a variable", async () => {
 			await openFile(flutterWebHelloWorldMainFile);
 			const config = await startDebugger(flutterWebHelloWorldMainFile);
 			await Promise.all([
@@ -430,12 +410,7 @@ describe("flutter for web debugger", () => {
 			assert.ok(evaluateResult.variablesReference);
 		});
 
-		it("complex expression expressions when in a top level function", async function () {
-			if (!extApi.flutterCapabilities.webSupportsDebugging) {
-				this.skip();
-				return;
-			}
-
+		it("complex expression expressions when in a top level function", async () => {
 			await openFile(flutterWebHelloWorldMainFile);
 			const config = await startDebugger(flutterWebHelloWorldMainFile);
 			await Promise.all([
@@ -453,12 +428,7 @@ describe("flutter for web debugger", () => {
 	});
 
 	// Skipped due to https://github.com/flutter/flutter/issues/17007.
-	it.skip("stops on exception", async function () {
-		if (!extApi.flutterCapabilities.webSupportsDebugging) {
-			this.skip();
-			return;
-		}
-
+	it.skip("stops on exception", async () => {
 		await openFile(flutterWebBrokenMainFile);
 		const config = await startDebugger(flutterWebBrokenMainFile);
 		await Promise.all([
@@ -472,12 +442,7 @@ describe("flutter for web debugger", () => {
 	});
 
 	// Skipped due to https://github.com/flutter/flutter/issues/17007.
-	it.skip("provides exception details when stopped on exception", async function () {
-		if (!extApi.flutterCapabilities.webSupportsDebugging) {
-			this.skip();
-			return;
-		}
-
+	it.skip("provides exception details when stopped on exception", async () => {
 		await openFile(flutterWebBrokenMainFile);
 		const config = await startDebugger(flutterWebBrokenMainFile);
 		await Promise.all([
@@ -493,12 +458,7 @@ describe("flutter for web debugger", () => {
 		ensureVariable(variables, "$e.message", "message", `"(TODO WHEN UNSKIPPING)"`);
 	});
 
-	it("logs expected text (and does not stop) at a logpoint", async function () {
-		if (!extApi.flutterCapabilities.webSupportsDebugging) {
-			this.skip();
-			return;
-		}
-
+	it("logs expected text (and does not stop) at a logpoint", async () => {
 		await openFile(flutterWebHelloWorldMainFile);
 		const config = await watchPromise("logs_expected_text->startDebugger", startDebugger(flutterWebHelloWorldMainFile));
 		await Promise.all([
