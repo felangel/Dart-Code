@@ -725,7 +725,7 @@ async function getResolvedDebugConfiguration(extraConfiguration?: { [key: string
 		request: "launch",
 		type: "dart",
 	}, extraConfiguration);
-	return await extApi.debugProvider.resolveDebugConfiguration(vs.workspace.workspaceFolders![0], debugConfig);
+	return await extApi.debugProvider.resolveDebugConfiguration!(vs.workspace.workspaceFolders![0], debugConfig);
 }
 
 export async function getLaunchConfiguration(script?: vs.Uri | string, extraConfiguration?: { [key: string]: any }): Promise<vs.DebugConfiguration | undefined | null> {
@@ -811,13 +811,20 @@ export function clearAllContext(context: Context): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, 50));
 }
 
-export function ensurePackageTreeNode(items: vs.TreeItem[], nodeContext: string, label: string, description?: string): vs.TreeItem {
+export function ensurePackageTreeNode(items: vs.TreeItem[] | undefined | null, nodeContext: string, label: string, description?: string): vs.TreeItem {
+	if (!items)
+		throw new Error("No tree nodes found to check");
+
 	const item = items.find((item) =>
 		item.contextValue === nodeContext
 		&& renderedItemLabel(item) === label,
 	);
+	if (!item)
+		throw new Error(`Did not find item matching ${label}`);
+
 	if (description)
 		assert.equal(item.description, description);
+
 	assert.ok(
 		item,
 		`Couldn't find ${nodeContext} tree node for ${label} in\n`
@@ -827,11 +834,11 @@ export function ensurePackageTreeNode(items: vs.TreeItem[], nodeContext: string,
 }
 
 export function renderedItemLabel(item: vs.TreeItem): string {
-	return item.label || path.basename(fsPath(item.resourceUri));
+	return item.label || path.basename(fsPath(item.resourceUri!));
 }
 
 export async function makeTextTree(suite: vs.Uri, provider: TestResultsProvider, parent?: TestItemTreeItem, buffer: string[] = [], indent = 0): Promise<string[]> {
-	const items = (await provider.getChildren(parent))
+	const items = (await provider.getChildren(parent))!
 		// Filter to only the suite we were given (though includes all children).
 		.filter((item) => (fsPath(item.resourceUri!) === fsPath(suite)) || !!parent);
 	const wsPath = fsPath(vs.workspace.getWorkspaceFolder(suite)!.uri);
