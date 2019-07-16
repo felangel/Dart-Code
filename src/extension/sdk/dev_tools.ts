@@ -131,19 +131,20 @@ export class DevToolsManager implements vs.Disposable {
 				// When a new debug session starts, we need to wait for its VM
 				// Service, then register it with this server.
 				this.disposables.push(this.debugCommands.onDebugSessionVmServiceAvailable(
-					(session) => service.vmRegister({ uri: session.vmServiceUri }),
+					(session) => service.vmRegister({ uri: session.vmServiceUri! }),
 				));
 
 				// And send any existing sessions we have.
-				debugSessions.forEach(
-					(session) => service.vmRegister({ uri: session.vmServiceUri }),
-				);
+				for (const session of debugSessions) {
+					if (session.vmServiceUri)
+						service.vmRegister({ uri: session.vmServiceUri });
+				}
 
 				portToBind = n.port;
 				resolve(`http://${n.host}:${n.port}/`);
 			});
 
-			service.process.on("close", (code) => {
+			service.process!.on("close", (code) => {
 				this.devtoolsUrl = undefined;
 				this.devToolsStatusBarItem.hide();
 				if (code && code !== 0) {
@@ -166,7 +167,7 @@ class DevToolsService extends StdIOService<UnknownNotification> {
 	constructor(logger: Logger, sdks: Sdks) {
 		super(() => config.devToolsLogFile, new CategoryLogger(logger, LogCategory.CommandProcesses), config.maxLogLineLength);
 
-		const pubBinPath = path.join(sdks.dart, pubPath);
+		const pubBinPath = path.join(sdks.dart!, pubPath);
 		portToBind = config.devToolsPort // Always config first
 			|| portToBind                // Then try the last port we bound this session
 			|| (isChromeOS && config.useKnownChromeOSPorts ? CHROME_OS_DEVTOOLS_PORT : 0);

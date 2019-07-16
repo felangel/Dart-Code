@@ -99,7 +99,7 @@ export class Analytics {
 	public logAnalyzerStartupTime(timeInMS: number) { this.time(Category.Analyzer, TimingVariable.Startup, timeInMS); }
 	public logDebugSessionDuration(timeInMS: number) { this.time(Category.Debugger, TimingVariable.SessionDuration, timeInMS); }
 	public logAnalyzerFirstAnalysisTime(timeInMS: number) { this.time(Category.Analyzer, TimingVariable.FirstAnalysis, timeInMS); }
-	public logDebuggerStart(resourceUri: Uri, debuggerType: string, runType: string) {
+	public logDebuggerStart(resourceUri: Uri | undefined, debuggerType: string, runType: string) {
 		const customData = {
 			cd15: debuggerType,
 			cd16: runType,

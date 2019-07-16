@@ -65,7 +65,7 @@ export class DartDebugSession extends DebugSession {
 	protected requiresProgram: boolean = true;
 	protected pollforMemoryMs?: number; // If set, will poll for memory usage and send events back.
 	protected processExit: Promise<void> = Promise.resolve();
-	protected maxLogLineLength: number;
+	protected maxLogLineLength: number = 1000; // This should always be overriden in launch/attach requests but we have it here for narrower types.
 	protected shouldKillProcessOnTerminate = true;
 	protected logCategory = LogCategory.General; // This isn't used as General, since both Flutter and FlutterWeb override it.
 	// protected observatoryUriIsProbablyReconnectable = false;
@@ -109,8 +109,15 @@ export class DartDebugSession extends DebugSession {
 		}
 
 		// Force relative paths to absolute.
-		if (args.program && !path.isAbsolute(args.program))
+		if (args.program && !path.isAbsolute(args.program)) {
+			if (!args.cwd) {
+				this.logToUser("Unable to start debugging. program was specificied as a relative path without cwd.\n");
+				this.sendEvent(new TerminatedEvent());
+				return;
+			}
+
 			args.program = path.join(args.cwd, args.program);
+		}
 		this.shouldKillProcessOnTerminate = true;
 		this.cwd = args.cwd;
 		this.noDebug = args.noDebug;
@@ -178,6 +185,7 @@ export class DartDebugSession extends DebugSession {
 		this.showDartDeveloperLogs = args.showDartDeveloperLogs;
 		this.evaluateGettersInDebugViews = args.evaluateGettersInDebugViews;
 		this.logFile = args.observatoryLogFile;
+		this.maxLogLineLength = args.maxLogLineLength;
 
 		this.log(`Attaching to process via ${args.observatoryUri}`);
 
@@ -204,7 +212,7 @@ export class DartDebugSession extends DebugSession {
 	}
 
 	protected sourceFileForArgs(args: DartLaunchRequestArguments) {
-		return path.relative(args.cwd, args.program);
+		return path.relative(args.cwd!, args.program);
 	}
 
 	protected spawnProcess(args: DartLaunchRequestArguments) {
@@ -263,7 +271,7 @@ export class DartDebugSession extends DebugSession {
 		this.sendEvent(new Event("dart.log", { message, severity, category: LogCategory.Observatory } as LogMessage));
 	}
 
-	protected initDebugger(uri: string): Promise<void> {
+	protected async initDebugger(uri: string): Promise<void> {
 		// Send the uri back to the editor so it can be used to launch browsers etc.
 		let browserFriendlyUri: string;
 		if (uri.endsWith("/ws")) {
@@ -306,6 +314,9 @@ export class DartDebugSession extends DebugSession {
 					const version: Version = versionResult.result as Version;
 					this.capabilities.version = `${version.major}.${version.minor}.0`;
 
+					if (!this.observatory)
+						return;
+
 					this.observatory.getVM().then(async (vmResult): Promise<void> => {
 						if (!this.observatory)
 							return;
@@ -338,7 +349,7 @@ export class DartDebugSession extends DebugSession {
 						if (!this.packageMap) {
 							// TODO: There's a race here if the isolate is not yet runnable, it might not have rootLib yet. We don't
 							// currently fill this in later.
-							if (rootIsolate)
+							if (rootIsolate && rootIsolate.rootLib)
 								this.packageMap = new PackageMap(PackageMap.findPackagesFile(this.convertVMUriToSourcePath(rootIsolate.rootLib.uri)));
 						}
 
@@ -401,6 +412,9 @@ export class DartDebugSession extends DebugSession {
 	}
 
 	private subscribeToStreams() {
+		if (!this.observatory)
+			return;
+
 		this.observatory.on("Isolate", (event: VMEvent) => this.handleIsolateEvent(event));
 		this.observatory.on("Extension", (event: VMEvent) => this.handleExtensionEvent(event));
 		this.observatory.on("Debug", (event: VMEvent) => this.handleDebugEvent(event));
@@ -516,22 +530,20 @@ export class DartDebugSession extends DebugSession {
 		args: DebugProtocol.SetBreakpointsArguments,
 	): Promise<void> {
 		if (this.noDebug) {
-			response.body = { breakpoints: args.breakpoints.map((b) => ({ verified: false })) };
+			response.body = { breakpoints: (args.breakpoints || []).map((b) => ({ verified: false })) };
 			this.sendResponse(response);
 			return;
 		}
 
 		const source: DebugProtocol.Source = args.source;
-		let breakpoints: DebugProtocol.SourceBreakpoint[] = args.breakpoints;
-		if (!breakpoints)
-			breakpoints = [];
+		const breakpoints: DebugProtocol.SourceBreakpoint[] = args.breakpoints || [];
 
 		// Get the correct format for the path depending on whether it's a package.
 		// TODO: The `|| source.name` stops a crash (#1566) but doesn't actually make
 		// the breakpoints work. This needs more work.
 		const uri = this.packageMap
-			? this.packageMap.convertFileToPackageUri(source.path) || formatPathForVm(source.path || source.name)
-			: formatPathForVm(source.path || source.name);
+			? this.packageMap.convertFileToPackageUri(source.path) || formatPathForVm((source.path || source.name)!)
+			: formatPathForVm((source.path || source.name)!);
 
 		try {
 			const result = await this.threadManager.setBreakpoints(uri, breakpoints);
@@ -585,6 +597,11 @@ export class DartDebugSession extends DebugSession {
 			return;
 		}
 
+		if (!this.observatory) {
+			this.errorResponse(response, `No observatory connection`);
+			return;
+		}
+
 		this.observatory.pause(thread.ref.id)
 			.then((_) => this.sendResponse(response))
 			.catch((error) => this.errorResponse(response, `${error}`));
@@ -613,23 +630,24 @@ export class DartDebugSession extends DebugSession {
 
 	protected stackTraceRequest(response: DebugProtocol.StackTraceResponse, args: DebugProtocol.StackTraceArguments): void {
 		const thread = this.threadManager.getThreadInfoFromNumber(args.threadId);
-		let startFrame: number = args.startFrame;
-		let levels: number = args.levels;
+		const startFrame = args.startFrame || 0;
+		let levels = args.levels;
 
 		if (!thread) {
 			this.errorResponse(response, `No thread with id ${args.threadId}`);
 			return;
 		}
 
+		if (!this.observatory) {
+			this.errorResponse(response, `No observatory connection`);
+			return;
+		}
+
 		this.observatory.getStack(thread.ref.id).then((result: DebuggerResult) => {
 			const stack: VMStack = result.result as VMStack;
-			let vmFrames: VMFrame[] = stack.asyncCausalFrames;
-			if (!vmFrames)
-				vmFrames = stack.frames;
+			let vmFrames = stack.asyncCausalFrames || stack.frames;
 			const totalFrames = vmFrames.length;
 
-			if (!startFrame)
-				startFrame = 0;
 			if (!levels)
 				levels = totalFrames;
 			if (startFrame + levels > totalFrames)
@@ -705,7 +723,7 @@ export class DartDebugSession extends DebugSession {
 
 				// Resolve the line and column information.
 				const promise = thread.getScript(location.script).then((script: VMScript) => {
-					const fileLocation: FileLocation = this.resolveFileLocation(script, location.tokenPos);
+					const fileLocation = this.resolveFileLocation(script, location.tokenPos);
 					if (fileLocation) {
 						stackFrame.line = fileLocation.line;
 						stackFrame.column = fileLocation.column;
@@ -748,11 +766,16 @@ export class DartDebugSession extends DebugSession {
 	}
 
 	protected async variablesRequest(response: DebugProtocol.VariablesResponse, args: DebugProtocol.VariablesArguments): Promise<void> {
+		if (!this.observatory) {
+			this.errorResponse(response, `No observatory connection`);
+			return;
+		}
+
 		const variablesReference = args.variablesReference;
 
 		// implement paged arrays
 		// let filter = args.filter; // optional; either "indexed" or "named"
-		let start = args.start; // (optional) index of the first variable to return; if omitted children start at 0
+		const start = args.start || 0; // (optional) index of the first variable to return; if omitted children start at 0
 		const count = args.count; // (optional) number of variables to return. If count is missing or 0, all variables are returned
 
 		const data = this.threadManager.getStoredData(variablesReference);
@@ -824,16 +847,12 @@ export class DartDebugSession extends DebugSession {
 							variables.push(await this.instanceRefToVariable(thread, canEvaluate, `${instanceRef.evaluateName}`, instance.kind, instanceRef, true));
 						} else if (instance.elements) {
 							const len = instance.elements.length;
-							if (!start)
-								start = 0;
 							const elementPromises = instance.elements.map(async (element, i) => this.instanceRefToVariable(thread, canEvaluate, `${instanceRef.evaluateName}[${i + start}]`, `[${i + start}]`, element, len <= maxValuesToCallToString));
 							// Add them in order.
 							const elementVariables = await Promise.all(elementPromises);
 							variables = variables.concat(elementVariables);
 						} else if (instance.associations) {
 							const len = instance.associations.length;
-							if (!start)
-								start = 0;
 							for (let i = 0; i < len; i++) {
 								const association = instance.associations[i];
 
@@ -875,7 +894,7 @@ export class DartDebugSession extends DebugSession {
 
 								// Call each getter, adding the result as a variable.
 								const getterPromises = getterNames.map(async (getterName, i) => {
-									const getterResult = await this.observatory.evaluate(thread.ref.id, instanceRef.id, getterName, true);
+									const getterResult = await this.observatory!.evaluate(thread.ref.id, instanceRef.id, getterName, true);
 									if (getterResult.result.type === "@Error") {
 										return { name: getterName, value: (getterResult.result as VMErrorRef).message, variablesReference: 0 };
 									} else if (getterResult.result.type === "Sentinel") {
@@ -887,7 +906,7 @@ export class DartDebugSession extends DebugSession {
 											`${instanceRef.evaluateName}.${getterName}`,
 											getterName,
 											getterResultInstanceRef,
-											instance.fields.length + i <= maxValuesToCallToString,
+											instance.fields!.length + i <= maxValuesToCallToString,
 										);
 									}
 								});
@@ -916,7 +935,7 @@ export class DartDebugSession extends DebugSession {
 
 	private async getGetterNamesForHierarchy(thread: VMIsolateRef, classRef: VMClassRef | undefined): Promise<string[]> {
 		let getterNames: string[] = [];
-		while (classRef) {
+		while (this.observatory && classRef) {
 			const classResponse = await this.observatory.getObject(thread.id, classRef.id);
 			if (classResponse.result.type !== "Class")
 				break;
@@ -943,14 +962,14 @@ export class DartDebugSession extends DebugSession {
 
 	private async callToString(isolate: VMIsolateRef, instanceRef: VMInstanceRef, getFullString: boolean = false): Promise<string | undefined> {
 		try {
-			const result = await this.observatory.evaluate(isolate.id, instanceRef.id, "toString()", true);
+			const result = await this.observatory!.evaluate(isolate.id, instanceRef.id, "toString()", true);
 			if (result.result.type === "@Error") {
 				return undefined;
 			} else {
 				let evalResult: VMInstanceRef = result.result as VMInstanceRef;
 
 				if (evalResult.valueAsStringIsTruncated && getFullString) {
-					const result = await this.observatory.getObject(isolate.id, evalResult.id);
+					const result = await this.observatory!.getObject(isolate.id, evalResult.id);
 					evalResult = result.result as VMInstanceRef;
 				}
 
@@ -1028,7 +1047,7 @@ export class DartDebugSession extends DebugSession {
 	protected async evaluateRequest(response: DebugProtocol.EvaluateResponse, args: DebugProtocol.EvaluateArguments): Promise<void> {
 		const expression: string = args.expression;
 		// Stack frame scope; if not specified, the expression is evaluated in the global scope.
-		const frameId: number = args.frameId;
+		const frameId = args.frameId;
 		// const context: string = args.context; // "watch", "repl", "hover"
 
 		if (!frameId) {
@@ -1041,14 +1060,14 @@ export class DartDebugSession extends DebugSession {
 		const frame: VMFrame = data.data as VMFrame;
 
 		try {
-			let result: DebuggerResult;
+			let result: DebuggerResult | undefined;
 			if ((expression === "$e" || expression.startsWith("$e.")) && thread.exceptionReference) {
 				const exceptionData = this.threadManager.getStoredData(thread.exceptionReference);
 				const exceptionInstanceRef = exceptionData && exceptionData.data as VMInstanceRef;
 
 				if (expression === "$e") {
 					response.body = {
-						result: await this.fullValueAsString(thread.ref, exceptionInstanceRef),
+						result: await this.fullValueAsString(thread.ref, exceptionInstanceRef) || "<unknown>",
 						variablesReference: thread.exceptionReference,
 					};
 					this.sendResponse(response);
@@ -1058,7 +1077,7 @@ export class DartDebugSession extends DebugSession {
 				const exceptionId = exceptionInstanceRef && exceptionInstanceRef.id;
 
 				if (exceptionId)
-					result = await this.observatory.evaluate(thread.ref.id, exceptionId, expression.substr(3), true);
+					result = await this.observatory!.evaluate(thread.ref.id, exceptionId, expression.substr(3), true);
 			}
 			if (!result) {
 				// Don't wait more than half a second for the response:
@@ -1067,7 +1086,7 @@ export class DartDebugSession extends DebugSession {
 				//   2. The VM sometimes doesn't respond to your requests at all
 				//      https://github.com/flutter/flutter/issues/18595
 				result = await Promise.race([
-					this.observatory.evaluateInFrame(thread.ref.id, frame.index, expression, true),
+					this.observatory!.evaluateInFrame(thread.ref.id, frame.index, expression, true),
 					new Promise<never>((resolve, reject) => setTimeout(() => reject(new Error("<timed out>")), 500)),
 				]);
 			}
@@ -1084,7 +1103,7 @@ export class DartDebugSession extends DebugSession {
 				instanceRef.evaluateName = expression;
 				const text = await this.fullValueAsString(thread.ref, instanceRef);
 				response.body = {
-					result: text,
+					result: text || "<unknown>",
 					variablesReference: this.isSimpleKind(instanceRef.kind) ? 0 : thread.storeData(instanceRef),
 				};
 				this.sendResponse(response);
@@ -1137,9 +1156,9 @@ export class DartDebugSession extends DebugSession {
 	public handleIsolateEvent(event: VMEvent) {
 		const kind = event.kind;
 		if (kind === "IsolateStart" || kind === "IsolateRunnable") {
-			this.threadManager.registerThread(event.isolate, kind);
+			this.threadManager.registerThread(event.isolate!, kind);
 		} else if (kind === "IsolateExit") {
-			this.threadManager.handleIsolateExit(event.isolate);
+			this.threadManager.handleIsolateExit(event.isolate!);
 		} else if (kind === "ServiceExtensionAdded") {
 			this.handleServiceExtensionAdded(event);
 		}
@@ -1164,7 +1183,7 @@ export class DartDebugSession extends DebugSession {
 			const record = event.logRecord;
 
 			if (record && record.message && record.message.valueAsString) {
-				this.logToUser(event.logRecord.message.valueAsString);
+				this.logToUser(event.logRecord.message.valueAsString || "");
 				if (record.message.valueAsStringIsTruncated)
 					this.logToUser("…");
 				this.logToUser("\n");
@@ -1267,7 +1286,7 @@ export class DartDebugSession extends DebugSession {
 				reason = "step";
 			} else if (kind === "PauseException") {
 				reason = "exception";
-				exceptionText = await this.fullValueAsString(event.isolate, event.exception);
+				exceptionText = await this.fullValueAsString(event.isolate, event.exception!);
 			}
 
 			thread.handlePaused(event.atAsyncSuspension, event.exception);
@@ -1369,8 +1388,10 @@ export class DartDebugSession extends DebugSession {
 				const endTokenIndex = startTokenIndex < allTokens.length - 1 ? startTokenIndex + 1 : startTokenIndex;
 				const startLoc = this.resolveFileLocation(r.script, allTokens[startTokenIndex]);
 				const endLoc = this.resolveFileLocation(r.script, allTokens[endTokenIndex]);
-				for (let i = startLoc.line; i <= endLoc.line; i++)
-					hitLines.push(i);
+				if (startLoc && endLoc) {
+					for (let i = startLoc.line; i <= endLoc.line; i++)
+						hitLines.push(i);
+				}
 			});
 			return {
 				hitLines,
@@ -1385,10 +1406,10 @@ export class DartDebugSession extends DebugSession {
 		if (!scriptUris || !scriptUris.length)
 			return [];
 
-		const result = await this.observatory.getVM();
+		const result = await this.observatory!.getVM();
 		const vm = result.result as VM;
 
-		const isolatePromises = vm.isolates.map((isolateRef) => this.observatory.getIsolate(isolateRef.id));
+		const isolatePromises = vm.isolates.map((isolateRef) => this.observatory!.getIsolate(isolateRef.id));
 		const isolatesResponses = await Promise.all(isolatePromises);
 		const isolates = isolatesResponses.map((response) => response.result as VMIsolate);
 
@@ -1398,7 +1419,7 @@ export class DartDebugSession extends DebugSession {
 
 		const results: Array<{ hostScriptPath: string, script: VMScript, tokenPosTable: number[][], startPos: number, endPos: number, hits: number[], misses: number[] }> = [];
 		for (const isolate of isolates) {
-			const libraryPromises = isolate.libraries.map((library) => this.observatory.getObject(isolate.id, library.id));
+			const libraryPromises = isolate.libraries.map((library) => this.observatory!.getObject(isolate.id, library.id));
 			const libraryResponses = await Promise.all(libraryPromises);
 			const libraries = libraryResponses.map((response) => response.result as VMLibrary);
 
@@ -1415,6 +1436,8 @@ export class DartDebugSession extends DebugSession {
 					const ranges = sourceReport.ranges.filter((r) => r.coverage && r.coverage.hits && r.coverage.hits.length);
 
 					for (const range of ranges) {
+						if (!range.coverage)
+							continue;
 						results.push({
 							endPos: range.endPos,
 							hits: range.coverage.hits,
@@ -1574,13 +1597,13 @@ export class DartDebugSession extends DebugSession {
 	}
 
 	private async pollForMemoryUsage(): Promise<void> {
-		if (!this.childProcess || this.childProcess.killed)
+		if (!this.childProcess || this.childProcess.killed || !this.observatory)
 			return;
 
 		const result = await this.observatory.getVM();
 		const vm = result.result as VM;
 
-		const isolatePromises = vm.isolates.map((isolateRef) => this.observatory.getIsolate(isolateRef.id));
+		const isolatePromises = vm.isolates.map((isolateRef) => this.observatory!.getIsolate(isolateRef.id));
 		const isolatesResponses = await Promise.all(isolatePromises);
 		const isolates = isolatesResponses.map((response) => response.result as VMIsolate);
 
@@ -1588,6 +1611,8 @@ export class DartDebugSession extends DebugSession {
 		let total = 0;
 
 		for (const isolate of isolates) {
+			if (!isolate._heaps)
+				continue;
 			for (const heap of [isolate._heaps.old, isolate._heaps.new]) {
 				current += heap.used + heap.external;
 				total += heap.capacity + heap.external;
@@ -1596,7 +1621,8 @@ export class DartDebugSession extends DebugSession {
 
 		this.sendEvent(new Event("dart.debugMetrics", { memory: { current, total } }));
 
-		setTimeout(() => this.pollForMemoryUsage(), this.pollforMemoryMs);
+		if (this.pollforMemoryMs)
+			setTimeout(() => this.pollForMemoryUsage(), this.pollforMemoryMs);
 	}
 
 	private getStackFrameData(message: string): StackFrameData | undefined {

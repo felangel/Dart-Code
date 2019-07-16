@@ -42,7 +42,7 @@ export interface DartLaunchRequestArguments extends DebugProtocol.LaunchRequestA
 	maxLogLineLength: number;
 	pubPath: string;
 	pubSnapshotPath: string;
-	pubTestLogFile: string;
+	pubTestLogFile?: string;
 	showMemoryUsage: boolean;
 }
 
@@ -52,7 +52,7 @@ export interface FlutterLaunchRequestArguments extends DartLaunchRequestArgument
 	forceFlutterVerboseMode?: boolean;
 	flutterTrackWidgetCreation: boolean;
 	flutterAttachSupportsUris: boolean;
-	flutterPath?: string;
+	flutterPath: string;
 	flutterMode?: "debug" | "profile" | "release";
 	flutterPlatform?: "default" | "android-arm" | "android-arm64" | "android-x86" | "android-x64";
 	flutterRunLogFile?: string;
@@ -67,6 +67,7 @@ export interface DartAttachRequestArguments extends DebugProtocol.AttachRequestA
 	debugExternalLibraries: boolean;
 	showDartDeveloperLogs: boolean;
 	evaluateGettersInDebugViews: boolean;
+	maxLogLineLength: number;
 	packages: string;
 	observatoryUri: string;
 	observatoryLogFile: string;
