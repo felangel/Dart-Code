@@ -233,16 +233,12 @@ describe("flutter for web debugger", () => {
 		]);
 	});
 
-	it.skip("runs projects in sub-folders when the open file is in a project sub-folder", async () => {
+	it("runs projects in sub-folders when the open file is in a project sub-folder", async () => {
 		await openFile(flutterWebHelloWorldExampleSubFolderMainFile);
 		const config = await startDebugger();
 		await Promise.all([
 			dc.configurationSequence(),
 			dc.launch(config),
-			// TODO: Remove this when we're not forced into noDebug mode, which
-			// results in InitializedEvent coming immediately, before the debugger
-			// is ready to accept reloads.
-			dc.waitForEvent("dart.launched"),
 		]);
 
 		// If we restart too fast, things fail :-/
@@ -259,15 +255,11 @@ describe("flutter for web debugger", () => {
 		]);
 	});
 
-	it.skip("runs projects in sub-folders when cwd is set to a project sub-folder", async () => {
+	it("runs projects in sub-folders when cwd is set to a project sub-folder", async () => {
 		const config = await startDebugger(undefined, "example");
 		await Promise.all([
 			dc.configurationSequence(),
 			dc.launch(config),
-			// TODO: Remove this when we're not forced into noDebug mode, which
-			// results in InitializedEvent coming immediately, before the debugger
-			// is ready to accept reloads.
-			dc.waitForEvent("dart.launched"),
 		]);
 
 		// If we restart too fast, things fail :-/
@@ -317,7 +309,7 @@ describe("flutter for web debugger", () => {
 				? ""
 				: ` after ${numReloads} reload${numReloads === 1 ? "" : "s"}`;
 
-		it("stops at a breakpoint" + reloadDescription, async () => {
+		it.skip("stops at a breakpoint" + reloadDescription, async () => {
 			await openFile(flutterWebHelloWorldMainFile);
 			const config = await startDebugger(flutterWebHelloWorldMainFile);
 			const expectedLocation = {
