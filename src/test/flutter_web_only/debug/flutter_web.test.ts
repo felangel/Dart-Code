@@ -11,7 +11,8 @@ import { activate, defer, delay, ext, extApi, flutterWebBrokenMainFile, flutterW
 describe("flutter for web debugger", () => {
 	beforeEach("activate flutterWebHelloWorldMainFile", () => activate(flutterWebHelloWorldMainFile));
 	before("get packages (0)", () => getPackages(flutterWebHelloWorldMainFile));
-	before("get packages (1)", () => getPackages(flutterWebBrokenMainFile));
+	before("get packages (1)", () => getPackages(flutterWebHelloWorldExampleSubFolderMainFile));
+	before("get packages (2)", () => getPackages(flutterWebBrokenMainFile));
 
 	let dc: DartDebugClient;
 	beforeEach("create debug client", () => {
@@ -256,7 +257,7 @@ describe("flutter for web debugger", () => {
 	});
 
 	it("runs projects in sub-folders when cwd is set to a project sub-folder", async () => {
-		const config = await startDebugger(undefined, "example");
+		const config = await startDebugger(undefined, "hello_world/example");
 		await Promise.all([
 			dc.configurationSequence(),
 			dc.launch(config),
